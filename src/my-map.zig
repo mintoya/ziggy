@@ -14,8 +14,8 @@ pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
             buckets: u32 = 32,
             from: []const Pair(keyType, valType) = &[_]Pair(keyType, valType){},
         };
-        pub const Iter = Iterator(Self, keyType, valType, getN);
-        each: Iter = {},
+
+        pub const each = Iterator(@This(), keyType, valType, getN);
         val: *cI.HMap = undefined,
 
         pub fn new(args: newArgs) Self {
@@ -70,7 +70,7 @@ pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
                 switch (keyType) {
                     []const u8 => cI.slice_fromFptr(res.key) orelse return null,
                     cI.fptr => res.key,
-                    else => cI.fromFptr(valType, res.key) orelse return null,
+                    else => cI.fromFptr(keyType, res.key) orelse return null,
                 },
                 switch (valType) {
                     []const u8 => cI.slice_fromFptr(res.val) orelse null,

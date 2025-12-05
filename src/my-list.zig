@@ -40,15 +40,15 @@ pub fn my_List(comptime T: type) type {
         };
 
         pub fn cConv(cError: u8) !void {
-            if (cError == cI.List_opErrorS.CantResize)
+            if (cError == c.List_opErrorS.CantResize)
                 return err.List_outOfMemory;
-            if (cError == cI.List_opErrorS.Invalid)
+            if (cError == c.List_opErrorS.Invalid)
                 return err.List_Unknown;
             return;
         }
         const Self = @This();
         pub const each = Iterator(Self, u32, T, getN);
-        val: *cI.List = undefined,
+        val: *c.List = undefined,
         pub const newArgs = struct {
             allocator: *const c.My_allocator = &(c.defaultAllocator),
             initial: u32 = 1,
@@ -56,11 +56,11 @@ pub fn my_List(comptime T: type) type {
         };
         pub fn new(args: newArgs) !Self {
             var res: Self = undefined;
-            res.val = cI.List_new(args.allocator, @sizeOf(T));
-            if (cI.List_validState(res.val) != cI.List_opErrorS.Ok) {
+            res.val = c.List_new(args.allocator, @sizeOf(T));
+            if (c.List_validState(res.val) != c.List_opErrorS.Ok) {
                 return Self.err.List_Unknown;
             }
-            if (cI.List_resize(res.val, args.initial) != cI.List_opErrorS.Ok) {
+            if (c.List_resize(res.val, args.initial) != c.List_opErrorS.Ok) {
                 return Self.err.List_outOfMemory;
             }
             for (args.from) |e| {
@@ -73,22 +73,22 @@ pub fn my_List(comptime T: type) type {
         }
         pub const init = new;
         pub fn push(self: Self, el: ?T) !void {
-            const res = cI.List_append(((self.val)), @as(*const anyopaque, @ptrCast(&el)));
+            const res = c.List_append(((self.val)), @as(*const anyopaque, @ptrCast(&el)));
             return cConv(res);
         }
         pub inline fn length(self: Self) u32 {
-            return cI.List_length(self.val);
+            return c.List_length(self.val);
         }
         pub fn set(self: Self, index: u32, val: ?T) void {
             if (val) |v| {
-                cI.List_set(self.val, index, &v);
+                c.List_set(self.val, index, &v);
             } else {
-                cI.List_set(self.val, index, null);
+                c.List_set(self.val, index, null);
             }
         }
         pub fn get(self: Self, index: u32) !T {
             const resptr: ?*T =
-                @ptrCast(@alignCast(cI.List_getRef((self.val), index)));
+                @ptrCast(@alignCast(c.List_getRef((self.val), index)));
             if (resptr) |p| {
                 return p.*;
             } else {
@@ -116,7 +116,7 @@ pub fn my_List(comptime T: type) type {
             return res;
         }
         pub fn free(self: Self) void {
-            cI.List_free((self.val));
+            c.List_free((self.val));
         }
         pub const deinit = free;
     };

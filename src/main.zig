@@ -78,8 +78,9 @@ pub fn main() !void {
     const h = gpa.allocator();
     var cTranslation = ATran.Zallocator().new(h);
 
-    const mainAllocator = cTranslation.translate();
-    //
+    const mainAllocator_h = cTranslation.translate();
+    const mainAllocator = &(mainAllocator_h);
+
     // const cArena = c.arena_new_ext(&mainAllocator, 2048);
     // defer {
     //     std.debug.print("current block size  {} \n", .{c.arena_footprint(cArena)});

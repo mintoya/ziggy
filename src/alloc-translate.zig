@@ -23,7 +23,7 @@ pub fn Zallocator() type {
         zAllocator: Allocator,
         const Self: type = @This();
         pub fn new(zAllocator: Allocator) Self {
-            return .{zAllocator};
+            return .{.zAllocator = zAllocator};
         }
         pub fn translate(self: *Self) My_allocator {
             return .{
