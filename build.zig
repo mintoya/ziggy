@@ -4,11 +4,18 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mod = b.addModule("zig", .{
-        .root_source_file = b.path("src/root.zig"),
+    const cModule = b.addModule("c_Imports", .{
+        .root_source_file = b.path("src/cInclude.zig"),
         .target = target,
     });
-
+    const listMod = b.addModule("clist", .{
+        .root_source_file = b.path("src/my-list.zig"),
+        .target = target,
+    });
+    const mapMod = b.addModule("cmap", .{
+        .root_source_file = b.path("src/my-map.zig"),
+        .target = target,
+    });
     const exe = b.addExecutable(.{
         .name = "zig",
         .root_module = b.createModule(.{
@@ -16,12 +23,15 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "zig", .module = mod },
+                .{ .name = "c_Imports", .module = cModule },
+                .{ .name = "clist", .module = listMod },
+                .{ .name = "cmap", .module = mapMod },
             },
         }),
     });
     exe.addObjectFile(.{ .cwd_relative = "wheels/build/wheels.o" });
     exe.linkLibC();
+    exe.addIncludePath(b.path("wheels"));
     exe.addIncludePath(b.path("*"));
 
     b.installArtifact(exe);
@@ -37,11 +47,17 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
+    const list_test = b.addTest(.{
+        .name = "list tests",
+        .root_module = listMod,
+    });
+    const map_test = b.addTest(.{
+        .name = "map tests",
+        .root_module = mapMod,
     });
 
-    const run_mod_tests = b.addRunArtifact(mod_tests);
+    const run_list_tests = b.addRunArtifact(list_test);
+    const run_map_tests = b.addRunArtifact(map_test);
 
     const exe_tests = b.addTest(.{
         .root_module = exe.root_module,
@@ -50,9 +66,8 @@ pub fn build(b: *std.Build) void {
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
     const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
+    test_step.dependOn(&run_cmd.step);
+    test_step.dependOn(&run_list_tests.step);
+    test_step.dependOn(&run_map_tests.step);
     test_step.dependOn(&run_exe_tests.step);
-    exe_tests.linkLibC();
-    exe_tests.addObjectFile(.{ .cwd_relative = "wheels/build/wheels.o" });
-    exe_tests.addIncludePath(b.path("."));
 }

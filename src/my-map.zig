@@ -1,21 +1,23 @@
 const std = @import("std");
 const zig = @import("zig");
-const c = @import("cInclude.zig").c;
-const cI = @import("cInclude.zig").cI;
-const listTypes = @import("my-list.zig");
+
+const cimports = @import("c_Imports");
+const c = cimports.c;
+const cI = cimports.cI;
+const listTypes = @import("clist");
 
 pub const Pair = listTypes.Pair;
 pub const Iterator = listTypes.Iterator;
 pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
     return struct {
         const Self = @This();
+        pub const PairType: type = Pair(keyType, valType);
+        pub const each = Iterator(Self, PairType, getN);
         pub const newArgs = struct {
             allocator: *const c.My_allocator = &(c.defaultAllocator),
             buckets: u32 = 32,
-            from: []const Pair(keyType, valType) = &[_]Pair(keyType, valType){},
+            from: []const PairType = &[_]PairType{},
         };
-
-        pub const each = Iterator(@This(), keyType, valType, getN);
         val: *cI.HMap = undefined,
 
         pub fn new(args: newArgs) Self {
@@ -63,7 +65,7 @@ pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
         pub fn length(self: Self) u32 {
             return cI.HMap_count(self.val);
         }
-        pub fn getN(self: Self, i: u32) ?Pair(keyType, valType) {
+        pub fn getN(self: Self, i: u32) ?PairType {
             if (i >= self.length()) return null;
             const res = cI.HMap_getNth(self.val, i);
             return .{
@@ -84,12 +86,13 @@ pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
 pub fn my_Omap(comptime keyType: type, comptime valType: type) type {
     return struct {
         const Self = @This();
+        pub const PairType: type = Pair(keyType, valType);
+        pub const each = Iterator(Self, PairType, getN);
         pub const newArgs = struct {
             allocator: *const c.My_allocator = &(c.defaultAllocator),
             buckets: u32 = 32,
-            from: []const Pair(keyType, valType) = &[_]Pair(keyType, valType){},
+            from: []const PairType = &[_]PairType{},
         };
-        pub const each = Iterator(@This(), keyType, valType, getN);
         val: *cI.OMap = undefined,
 
         pub fn new(args: newArgs) Self {
@@ -137,7 +140,7 @@ pub fn my_Omap(comptime keyType: type, comptime valType: type) type {
         pub fn length(self: Self) u32 {
             return cI.OMap_length(self.val);
         }
-        pub fn getN(self: Self, i: u32) ?Pair(keyType, valType) {
+        pub fn getN(self: Self, i: u32) ?PairType {
             if (i >= self.length()) return null;
             const resultkey = cI.OMap_getKey(self.val, i);
             const resultval = cI.OMap_getVal(self.val, i);
@@ -155,4 +158,43 @@ pub fn my_Omap(comptime keyType: type, comptime valType: type) type {
             };
         }
     };
+}
+
+test "zig c impl test omap" {
+    const expect = std.testing.expect;
+
+    const intHMap = my_Omap(i32, i32).new(.{});
+    defer intHMap.free();
+
+    for (0..5) |i| {
+        const ii: i32 = @intCast(i);
+        intHMap.set(ii, ii * ii);
+    }
+    for (0..5) |i| {
+        const ii: i32 = @intCast(i);
+        if (intHMap.get(ii)) |iii| {
+            try expect(ii * ii == iii + 1);
+        } else {
+            return error.notNull;
+        }
+    }
+}
+test "zig c impl test hmap" {
+    const expect = std.testing.expect;
+
+    const intHMap = my_Hmap(i32, i32).new(.{});
+    defer intHMap.free();
+
+    for (0..5) |i| {
+        const ii: i32 = @intCast(i);
+        intHMap.set(ii, ii * ii);
+    }
+    for (0..5) |i| {
+        const ii: i32 = @intCast(i);
+        if (intHMap.get(ii)) |iii| {
+            try expect(ii * ii == iii + 1);
+        } else {
+            return error.notNull;
+        }
+    }
 }

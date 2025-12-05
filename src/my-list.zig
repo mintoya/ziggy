@@ -1,25 +1,22 @@
 const std = @import("std");
 const zig = @import("zig");
-const c = @import("cInclude.zig").c;
-const cI = @import("cInclude.zig").cI;
+
+const cimports = @import("c_Imports");
+const c = cimports.c;
+const cI = cimports.cI;
 
 pub fn Pair(keyType: type, valType: type) type {
     return struct { keyType, ?valType };
 }
-pub fn Iterator(
-    comptime Self: type,
-    comptime Key: type,
-    comptime Value: type,
-    getN: fn (Self, u32) ?Pair(Key, Value),
-) fn (
+pub fn Iterator(comptime Self: type, comptime pairType: type, getN: fn (Self, u32) ?pairType) fn (
     self: Self,
-    func: fn (Pair(Key, Value), context: anytype) void,
+    func: fn (pairType, context: anytype) void,
     context: anytype,
 ) void {
     return struct {
         pub fn each(
             self: Self,
-            func: fn (item: Pair(Key, Value), context: anytype) void,
+            func: fn (item: pairType, context: anytype) void,
             context: anytype,
         ) void {
             var i: u32 = 0;
@@ -47,12 +44,13 @@ pub fn my_List(comptime T: type) type {
             return;
         }
         const Self = @This();
-        pub const each = Iterator(Self, u32, T, getN);
+        pub const PairType: type = Pair(u32, T);
+        pub const each = Iterator(Self, PairType, getN);
         val: *c.List = undefined,
         pub const newArgs = struct {
             allocator: *const c.My_allocator = &(c.defaultAllocator),
             initial: u32 = 1,
-            from: []const Pair(u32, T) = &[_]Pair(u32, T){},
+            from: []const PairType = &[_]PairType{},
         };
         pub fn new(args: newArgs) !Self {
             var res: Self = undefined;
@@ -64,7 +62,7 @@ pub fn my_List(comptime T: type) type {
                 return Self.err.List_outOfMemory;
             }
             for (args.from) |e| {
-                while (res.length() < e[0]+1) {
+                while (res.length() < e[0] + 1) {
                     try res.push(null);
                 }
                 res.set(e[0], e[1]);
@@ -95,7 +93,7 @@ pub fn my_List(comptime T: type) type {
                 return Self.err.List_OutOfBounds;
             }
         }
-        pub fn getN(self: Self, i: u32) ?Pair(u32, T) {
+        pub fn getN(self: Self, i: u32) ?PairType {
             const res: T = get(self, i) catch unreachable;
             return .{ i, res };
         }
@@ -120,4 +118,22 @@ pub fn my_List(comptime T: type) type {
         }
         pub const deinit = free;
     };
+}
+
+test "zig c impl test list" {
+    const expect = std.testing.expect;
+    const l = try my_List(usize).new(.{});
+    defer l.free();
+    for (0..5) |i| {
+        try l.push(i);
+    }
+    try expect(l.length() == 5);
+    var v = true;
+    l.each(struct {
+        fn do(e: Pair(u32, usize), vptr: anytype) void {
+            const vp: *bool = vptr;
+            vp.* = (e[0] == e[1] + 1) and vp.*;
+        }
+    }.do, &v);
+    try expect(v);
 }
