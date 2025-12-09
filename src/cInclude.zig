@@ -3,9 +3,10 @@ const assert = std.debug.assert;
 
 pub const c =
     @cImport({
-        @cInclude("../wheels/my-list.h");
-        @cInclude("../wheels/allocator.h");
-        @cInclude("../wheels/arenaAllocator.h");
+        @cInclude("my-list.h");
+        // @cInclude("hhmap.h");
+        @cInclude("allocator.h");
+        @cInclude("arenaAllocator.h");
     });
 
 pub const cI = struct {

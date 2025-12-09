@@ -8,17 +8,42 @@ const listTypes = @import("clist");
 
 pub const Pair = listTypes.Pair;
 pub const Iterator = listTypes.Iterator;
+pub fn MapTypeGenerator(
+    comptime Self: type,
+    comptime keytype: type,
+    comptime valtype: type,
+    comptime getter: fn (*Self, keytype) ?valtype,
+    comptime setter: fn (*Self, keytype, valtype) void,
+) type {
+    return struct {
+        parent: Self,
+        pub fn get(this: @This(), key: keytype) ?valtype {
+            return getter(this.parent, key);
+        }
+        pub fn set(this: @This(), key: keytype, val: valtype) void {
+            return setter(this.parent, key, val);
+        }
+    };
+}
 pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
     return struct {
         const Self = @This();
         pub const PairType: type = Pair(keyType, valType);
         pub const each = Iterator(Self, PairType, getN);
         pub const newArgs = struct {
-            allocator: *const c.My_allocator = &(c.defaultAllocator),
+            allocator: *const c.My_allocator,
             buckets: u32 = 32,
             from: []const PairType = &[_]PairType{},
         };
         val: *cI.HMap = undefined,
+        pub fn MapType(self: @This()) type {
+            return MapTypeGenerator(
+                @This(),
+                keyType,
+                valType,
+                get, set
+                ){self};
+        }
 
         pub fn new(args: newArgs) Self {
             var self: Self = undefined;
@@ -89,7 +114,7 @@ pub fn my_Omap(comptime keyType: type, comptime valType: type) type {
         pub const PairType: type = Pair(keyType, valType);
         pub const each = Iterator(Self, PairType, getN);
         pub const newArgs = struct {
-            allocator: *const c.My_allocator = &(c.defaultAllocator),
+            allocator: *const c.My_allocator,
             buckets: u32 = 32,
             from: []const PairType = &[_]PairType{},
         };

@@ -39,8 +39,8 @@ pub fn my_List(comptime T: type) type {
         pub fn cConv(cError: u8) !void {
             if (cError == c.List_opErrorS.CantResize)
                 return err.List_outOfMemory;
-            if (cError == c.List_opErrorS.Invalid)
-                return err.List_Unknown;
+            // if (cError == c.List_opErrorS.Invalid)
+            //     return err.List_Unknown;
             return;
         }
         const Self = @This();
@@ -48,7 +48,7 @@ pub fn my_List(comptime T: type) type {
         pub const each = Iterator(Self, PairType, getN);
         val: *c.List = undefined,
         pub const newArgs = struct {
-            allocator: *const c.My_allocator = &(c.defaultAllocator),
+            allocator: *const c.My_allocator,
             initial: u32 = 1,
             from: []const PairType = &[_]PairType{},
         };
@@ -71,8 +71,10 @@ pub fn my_List(comptime T: type) type {
         }
         pub const init = new;
         pub fn push(self: Self, el: ?T) !void {
-            const res = c.List_append(((self.val)), @as(*const anyopaque, @ptrCast(&el)));
-            return cConv(res);
+            return cConv(if (el) |e|
+                c.List_append(self.val, &e)
+            else
+                c.List_append(self.val, null));
         }
         pub inline fn length(self: Self) u32 {
             return c.List_length(self.val);

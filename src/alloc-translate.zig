@@ -3,7 +3,7 @@ const c = @import("c_Imports").c;
 
 const Log = std.log.scoped(.my_alloc_zig);
 const Allocator = std.mem.Allocator;
-const Mutex = std.Thread.Mutex;
+// const Mutex = std.Thread.Mutex;
 const My_allocator = c.My_allocator;
 
 // [copied from here](https://github.com/D-Berg/zalloc)
@@ -18,19 +18,21 @@ fn getPtr(slice: []u8, size: usize) [*]u8 {
     @memcpy(slice[0..@sizeOf(usize)], std.mem.toBytes(size)[0..]);
     return slice.ptr + @sizeOf(usize);
 }
+//
+
 pub fn Zallocator() type {
     return struct {
         zAllocator: Allocator,
         const Self: type = @This();
         pub fn new(zAllocator: Allocator) Self {
-            return .{.zAllocator = zAllocator};
+            return .{ .zAllocator = zAllocator };
         }
-        pub fn translate(self: *Self) My_allocator {
+        pub fn translate(self: *const Self) My_allocator {
             return .{
-                .arb = self,
+                .arb = @ptrCast(@constCast(self)),
                 .alloc = c_alloc,
                 .free = c_free,
-                .r_alloc = c_realloc,
+                .ralloc = c_realloc,
             };
         }
         pub fn malloc(self: Self, bytes: usize) ?[*]u8 {
@@ -83,3 +85,4 @@ pub fn Zallocator() type {
         }
     };
 }
+pub fn Callocator() type {}
