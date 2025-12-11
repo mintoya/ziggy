@@ -4,7 +4,6 @@ const assert = std.debug.assert;
 pub const c =
     @cImport({
         @cInclude("my-list.h");
-        // @cInclude("hhmap.h");
         @cInclude("allocator.h");
         @cInclude("arenaAllocator.h");
     });
@@ -69,9 +68,20 @@ pub const cI = struct {
     pub extern fn OMap_new(*const c.My_allocator) *OMap;
     pub extern fn OMap_free(*OMap) void;
     pub extern fn OMap_remake(*OMap) void;
-    pub extern fn OMap_getRaw(*OMap, fptr) fptr;
+    pub extern fn OMap_getRaw(*const OMap, fptr) fptr;
     pub extern fn OMap_setRaw(*OMap, key: fptr, val: fptr) c_uint;
     pub extern fn OMap_length(*const OMap) u32;
     pub extern fn OMap_getKey(*const OMap, u32) fptr;
     pub extern fn OMap_getVal(*const OMap, u32) fptr;
+
+    pub const HHMap = extern struct {};
+    pub extern fn HHMap_new(keysize: usize, valuesize: usize, *const c.My_allocator, buckets: u32) *HHMap;
+    pub extern fn HHMap_free(map: *HHMap) void;
+    pub extern fn HHmap_getSet(map: *HHMap, key: *const anyopaque, val: *void) bool;
+    pub extern fn HHMap_set(map: *HHMap, key: *const anyopaque, val: *const anyopaque) void;
+    pub extern fn HHMap_get(map: *const HHMap, key: *const anyopaque) ?*anyopaque;
+    pub extern fn HHMap_getMetaSize(map: *const HHMap) u32;
+    pub extern fn HHMap_count(map: *const HHMap) u32;
+    pub extern fn HHMap_getKey(map: *const HHMap, idx: u32) *anyopaque;
+    pub extern fn HHMap_getVal(map: *const HHMap, idx: u32) *anyopaque;
 };

@@ -37,12 +37,7 @@ pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
         };
         val: *cI.HMap = undefined,
         pub fn MapType(self: @This()) type {
-            return MapTypeGenerator(
-                @This(),
-                keyType,
-                valType,
-                get, set
-                ){self};
+            return MapTypeGenerator(@This(), keyType, valType, get, set){self};
         }
 
         pub fn new(args: newArgs) Self {
@@ -180,6 +175,61 @@ pub fn my_Omap(comptime keyType: type, comptime valType: type) type {
                     cI.fptr => resultval,
                     else => cI.fromFptr(valType, resultval) orelse null,
                 },
+            };
+        }
+    };
+}
+pub fn my_HHmap(comptime keyType: type, comptime valType: type) type {
+    return struct {
+        const Self = @This();
+        pub const PairType: type = Pair(keyType, valType);
+        pub const each = Iterator(Self, PairType, getN);
+        pub const newArgs = struct {
+            allocator: *const c.My_allocator,
+            buckets: u32 = 32,
+            from: []const PairType = &[_]PairType{},
+        };
+        // comptime padding: usize =
+        //     @max(@alignOf(keyType), @alignOf(keyType)) -
+        //     @min(@alignOf(keyType), @alignOf(keyType)),
+        val: *cI.HHMap = undefined,
+        pub fn MapType(self: @This()) type {
+            return MapTypeGenerator(@This(), keyType, valType, get, set){self};
+        }
+
+        pub fn new(args: newArgs) Self {
+            var self: Self = undefined;
+            self.val = cI.HHMap_new(@sizeOf(keyType), @sizeOf(valType), args.allocator, args.buckets);
+            for (args.from) |e| {
+                self.set(e[0], e[1]);
+            }
+            return self;
+        }
+        pub const init = new;
+        pub fn free(self: Self) void {
+            cI.HHMap_free(self.val);
+        }
+        pub const deinit = free;
+        pub fn set(self: Self, k: keyType, v: ?valType) void {
+            cI.HHMap_set(self.val, &k, &v);
+        }
+        pub fn get(self: Self, k: keyType) ?valType {
+            var val: valType = undefined;
+            if (cI.HHmap_getSet(self.val, &k, &val)) {
+                return val;
+            } else {
+                return null;
+            }
+        }
+        pub fn length(self: Self) u32 {
+            return cI.HHMap_count(self.val);
+        }
+        pub fn getN(self: Self, i: u32) ?PairType {
+            const key: *anyopaque = cI.HHMap_getKey(self.val, i);
+            const val: *anyopaque = cI.HHMap_getVal(self.val, i);
+            return .{
+                @as(*keyType, @ptrCast(@alignCast(@constCast(key)))).*,
+                @as(*valType, @ptrCast(@alignCast(@constCast(val)))).*,
             };
         }
     };

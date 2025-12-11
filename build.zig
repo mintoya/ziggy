@@ -45,8 +45,13 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.linkLibC();
-    exe.addObjectFile(.{ .cwd_relative = "wheels/build/wheels.o" });
-    exe.linkLibC();
+    exe.root_module.addCSourceFile(
+        .{
+            .file = .{
+                .cwd_relative = "wheels/examples/includeAll.c",
+            },
+        },
+    );
 
     b.installArtifact(exe);
 
@@ -74,12 +79,17 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-
     main_tests.root_module.addImport("c_Imports", cMod);
     main_tests.root_module.addImport("clist", listMod);
     main_tests.root_module.addImport("cmap", mapMod);
 
-    main_tests.addObjectFile(.{ .cwd_relative = "wheels/build/wheels.o" });
+    main_tests.root_module.addCSourceFile(
+        .{
+            .file = .{
+                .cwd_relative = "wheels/examples/includeAll.c",
+            },
+        },
+    );
     main_tests.linkLibC();
 
     const run_main_tests = b.addRunArtifact(main_tests);
