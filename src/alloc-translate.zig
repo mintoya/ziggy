@@ -6,7 +6,7 @@ const Allocator = std.mem.Allocator;
 // const Mutex = std.Thread.Mutex;
 const My_allocator = c.My_allocator;
 
-// [copied from here](https://github.com/D-Berg/zalloc)
+// [thanks to](https://github.com/D-Berg/zalloc)
 fn getSlice(ptr: [*]u8) []u8 {
     var slice: []u8 = undefined;
     slice.ptr = ptr - @sizeOf(usize);
