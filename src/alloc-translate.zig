@@ -3,7 +3,6 @@ const c = @import("c_Imports").c;
 
 const Log = std.log.scoped(.my_alloc_zig);
 const Allocator = std.mem.Allocator;
-// const Mutex = std.Thread.Mutex;
 const My_allocator = c.My_allocator;
 
 // [thanks to](https://github.com/D-Berg/zalloc)

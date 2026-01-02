@@ -17,9 +17,9 @@ pub fn main() !void {
     const testMap = cHardMap([8]u8, i32).new(.{ .allocator = cver });
 
     defer testMap.free();
-    testMap.set("hello wo".*, 2);
+    testMap.set("hello wo".*, 0);
     testMap.set("hell owo".*, 2);
-    testMap.set("hel lowo".*, 2);
+    testMap.set("hel lowo".*, 8);
     testMap.set("he llowo".*, 2);
     testMap.set("h ellowo".*, 7);
 
