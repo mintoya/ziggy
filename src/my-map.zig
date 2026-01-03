@@ -4,6 +4,7 @@ const zig = @import("zig");
 const cimports = @import("c_Imports");
 const c = cimports.c;
 const cI = cimports.cI;
+const Zallocator = cimports.Zallocator;
 const listTypes = @import("clist");
 
 pub fn my_Hmap(comptime keyType: type, comptime valType: type) type {
@@ -134,7 +135,7 @@ pub fn my_HHmap(comptime keyType: type, comptime valType: type) type {
             self.val = cI.HHMap_new(
                 @sizeOf(keyType),
                 @sizeOf(valType),
-                args.allocator,
+                (args.allocator),
                 args.buckets,
             );
             for (args.from) |e| {
