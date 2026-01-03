@@ -44,12 +44,6 @@ pub const cI = struct {
     }
 
     pub const List = extern struct {};
-    pub const List_opErrorS_Type = extern struct { // Define the TYPE
-        Ok: u8,
-        CantResize: u8,
-        Invalid: u8,
-    };
-    pub extern const List_opErrorS: List_opErrorS_Type;
     pub const HMap = extern struct {};
     pub const HMap_both = extern struct {
         key: fptr,
@@ -78,10 +72,12 @@ pub const cI = struct {
     pub extern fn HHMap_new(keysize: usize, valuesize: usize, *const c.My_allocator, buckets: u32) *HHMap;
     pub extern fn HHMap_free(map: *HHMap) void;
     pub extern fn HHmap_getSet(map: *HHMap, key: *const anyopaque, val: *void) bool;
-    pub extern fn HHMap_set(map: *HHMap, key: *const anyopaque, val: *const anyopaque) void;
+    pub extern fn HHMap_set(map: *HHMap, key: *const anyopaque, val: ?*const anyopaque) void;
     pub extern fn HHMap_get(map: *const HHMap, key: *const anyopaque) ?*anyopaque;
     pub extern fn HHMap_getMetaSize(map: *const HHMap) u32;
     pub extern fn HHMap_count(map: *const HHMap) u32;
     pub extern fn HHMap_getKey(map: *const HHMap, idx: u32) *anyopaque;
     pub extern fn HHMap_getVal(map: *const HHMap, idx: u32) *anyopaque;
+    pub extern fn HHMap_fset(map: *const HHMap, key: fptr, val: ?*const anyopaque) void;
+    pub extern fn HHMap_fget(map: *const HHMap, key: fptr) ?*anyopaque;
 };
