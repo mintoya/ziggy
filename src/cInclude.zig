@@ -3,11 +3,9 @@ const assert = std.debug.assert;
 
 pub const c =
     @cImport({
-        @cInclude("my-list.h");
         @cInclude("allocator.h");
-        @cInclude("arenaAllocator.h");
+        @cInclude("vason_arr.h");
     });
-
 pub const cI = struct {
     pub const fptr = extern struct {
         width: usize,
@@ -18,17 +16,6 @@ pub const cI = struct {
             .ptr = @ptrCast(@constCast(s.ptr)),
             .width = s.len,
         };
-    }
-    pub fn fromFptr(comptime T: type, f: fptr) ?T {
-        if (f.ptr != null and f.width > 0) {
-            var res: T = undefined;
-            assert(f.width >= @sizeOf(T));
-            _ = c.memcpy(&res, f.ptr, f.width);
-            return res;
-        } else {
-            assert(f.width == 0);
-            return null;
-        }
     }
     pub fn slice_fromFptr(s: fptr) ?[]const u8 {
         if (null != s.ptr and s.width > 0)
@@ -42,122 +29,103 @@ pub const cI = struct {
             .width = @sizeOf(T),
         };
     }
-
-    pub const List = extern struct {};
-    pub const HMap = extern struct {};
-    pub const HMap_both = extern struct {
-        key: fptr,
-        val: fptr,
-    };
-
-    pub extern fn HMap_new(*const c.My_allocator, u32) *HMap;
-    pub extern fn HMap_free(*HMap) void;
-    pub extern fn HMap_remake(*HMap) void;
-    pub extern fn HMap_get(*const HMap, fptr) fptr;
-    pub extern fn HMap_set(*HMap, key: fptr, val: fptr) c_uint;
-    pub extern fn HMap_count(*const HMap) u32;
-    pub extern fn HMap_getNth(*const HMap, u32) HMap_both;
-
-    pub const OMap = extern struct {};
-    pub extern fn OMap_new(*const c.My_allocator) *OMap;
-    pub extern fn OMap_free(*OMap) void;
-    pub extern fn OMap_remake(*OMap) void;
-    pub extern fn OMap_getRaw(*const OMap, fptr) fptr;
-    pub extern fn OMap_setRaw(*OMap, key: fptr, val: fptr) c_uint;
-    pub extern fn OMap_length(*const OMap) u32;
-    pub extern fn OMap_getKey(*const OMap, u32) fptr;
-    pub extern fn OMap_getVal(*const OMap, u32) fptr;
-
-    pub const HHMap = extern struct {};
-    pub extern fn HHMap_new(keysize: usize, valuesize: usize, *const c.My_allocator, buckets: u32) *HHMap;
-    pub extern fn HHMap_free(map: *HHMap) void;
-    pub extern fn HHmap_getSet(map: *HHMap, key: *const anyopaque, val: *void) bool;
-    pub extern fn HHMap_set(map: *HHMap, key: *const anyopaque, val: ?*const anyopaque) void;
-    pub extern fn HHMap_get(map: *const HHMap, key: *const anyopaque) ?*anyopaque;
-    pub extern fn HHMap_getMetaSize(map: *const HHMap) u32;
-    pub extern fn HHMap_count(map: *const HHMap) u32;
-    pub extern fn HHMap_getKey(map: *const HHMap, idx: u32) *anyopaque;
-    pub extern fn HHMap_getVal(map: *const HHMap, idx: u32) *anyopaque;
-    pub extern fn HHMap_fset(map: *const HHMap, key: fptr, val: ?*const anyopaque) void;
-    pub extern fn HHMap_fget(map: *const HHMap, key: fptr) ?*anyopaque;
 };
 
 const Log = std.log.scoped(.my_alloc_zig);
 const Allocator = std.mem.Allocator;
 const My_allocator = c.My_allocator;
 
-// [thanks to](https://github.com/D-Berg/zalloc)
-fn getSlice(ptr: [*]u8) []u8 {
-    var slice: []u8 = undefined;
-    slice.ptr = ptr - @sizeOf(usize);
-    const len_of_allocation = std.mem.bytesToValue(usize, slice.ptr[0..@sizeOf(usize)]);
-    slice.len = len_of_allocation + @sizeOf(usize);
-    return slice;
-}
-fn getPtr(slice: []u8, size: usize) [*]u8 {
-    @memcpy(slice[0..@sizeOf(usize)], std.mem.toBytes(size)[0..]);
-    return slice.ptr + @sizeOf(usize);
-}
-//
-
 pub const Zallocator = struct {
-    zAllocator: Allocator,
-    const Self: type = @This();
-    pub fn translate(self: *const Self) My_allocator {
-        return .{
-            .arb = @ptrCast(@constCast(self)),
-            .alloc = c_alloc,
-            .free = c_free,
-            .ralloc = c_realloc,
-            .size = null,
-        };
+    cAllocator: My_allocator = .{
+        .alloc = c_alloc,
+        .free = c_free,
+        .resize = c_realloc,
+        .size = c_size,
+    },
+    zAllocator: Allocator align(@alignOf(c.max_align_t)),
+    fn getptr(ptr: *anyopaque) *const @This() {
+        return @ptrCast(@alignCast(@constCast(ptr)));
     }
-    fn malloc(self: Self, bytes: usize) ?[*]u8 {
-        const slice = self.zAllocator.alloc(u8, bytes + @sizeOf(usize)) catch |e| {
-            Log.err("!malloc {s}\n", .{@errorName(e)});
+    pub fn allocatorPtr(self: *const @This()) [*c]const My_allocator {
+        return @ptrCast(@constCast(self));
+    }
+    const C_Align = @alignOf(std.c.max_align_t);
+    const Z_Align = std.mem.Alignment.fromByteUnits(C_Align);
+
+    const HeaderSize = std.mem.alignForward(usize, @sizeOf(usize), C_Align);
+
+    inline fn getSlice(mem: [*]u8) []u8 {
+        const base_ptr = mem - HeaderSize;
+        const size_ptr: *usize = @ptrCast(@alignCast(base_ptr));
+        return base_ptr[0 .. size_ptr.* + HeaderSize];
+    }
+
+    inline fn getPtr(slice: []u8, requested_bytes: usize) [*]u8 {
+        const size_ptr: *usize = @ptrCast(@alignCast(slice.ptr));
+        size_ptr.* = requested_bytes;
+        return slice.ptr + HeaderSize;
+    }
+
+    pub fn malloc(self: *const Zallocator, bytes: usize) callconv(.c) ?*anyopaque {
+        const slice = self.zAllocator.alignedAlloc(u8, Z_Align, bytes + HeaderSize) catch |e| {
+            std.log.scoped(.main).err("!malloc {s}\n", .{@errorName(e)});
             return null;
         };
-        return getPtr(slice, bytes);
+        return @ptrCast(getPtr(slice, bytes));
     }
-    fn realloc(self: Self, memq: ?[*]u8, bytes: usize) ?[*]u8 {
-        const mem = memq orelse return null;
-        const slice: []u8 = getSlice(mem);
-        const newSlice: []u8 = self.zAllocator.realloc(slice, bytes + @sizeOf(usize)) catch |e| {
-            Log.err("!realloc {s}\n", .{@errorName(e)});
+
+    pub fn realloc(self: *const Zallocator, memq: ?*anyopaque, bytes: usize) callconv(.c) ?*anyopaque {
+        const mem: [*]u8 = @ptrCast(memq orelse return self.malloc(bytes));
+        const old_slice = getSlice(mem);
+        const new_slice = self.zAllocator.alignedAlloc(u8, Z_Align, bytes + HeaderSize) catch |e| {
+            std.log.scoped(.main).err("!malloc {s}\n", .{@errorName(e)});
             return null;
         };
-        return getPtr(newSlice, bytes);
+
+        @memcpy(new_slice, old_slice);
+        self.zAllocator.free(old_slice);
+
+        return @ptrCast(getPtr(new_slice, bytes));
     }
-    fn free(self: Self, memq: ?[*]u8) void {
-        const mem = memq orelse return;
-        const sliceq: ?[]u8 = getSlice(mem);
-        const slice = sliceq orelse return;
-        self.zAllocator.free(slice);
+
+    pub fn free(self: *const Zallocator, memq: ?*anyopaque) callconv(.c) void {
+        const mem: [*]u8 = @ptrCast(memq orelse return);
+        const slice = getSlice(mem);
+        self.zAllocator.rawFree(slice, Z_Align, @returnAddress());
     }
 
     fn c_alloc(
         allocator: [*c]const My_allocator,
         size: usize,
-    ) callconv(.c) ?*anyopaque {
-        var alloc = @as(*Self, @ptrCast(@alignCast(@constCast(allocator.*.arb))));
-        const mem = alloc.malloc(size) orelse return @as(?*anyopaque, @ptrFromInt(0));
+    ) callconv(.c) *anyopaque {
+        var alloc = getSelf(@constCast(allocator));
+        const mem = alloc.malloc(size) orelse unreachable;
         return @ptrCast(mem);
     }
-
     fn c_realloc(
         allocator: [*c]const My_allocator,
         mem: ?*anyopaque,
         size: usize,
     ) callconv(.c) ?*anyopaque {
-        var alloc = @as(*Self, @ptrCast(@alignCast(@constCast(allocator.*.arb))));
+        var alloc = getSelf(@constCast(allocator));
         const newmem = alloc.realloc(@ptrCast(mem), size) orelse return @as(?*anyopaque, @ptrFromInt(0));
         return @ptrCast(newmem);
     }
+
     fn c_free(
         allocator: [*c]const My_allocator,
         mem: ?*anyopaque,
     ) callconv(.c) void {
-        var alloc = @as(*Self, @ptrCast(@alignCast(@constCast(allocator.*.arb))));
+        var alloc = getSelf(@constCast(allocator));
         alloc.free(@ptrCast(mem));
+    }
+
+    fn c_size(
+        _: [*c]const My_allocator,
+        mem: ?*anyopaque,
+    ) callconv(.c) usize {
+        const ptr = mem orelse return 0;
+        const slice: []u8 = getSlice(@ptrCast(ptr));
+        return slice.len;
     }
 };

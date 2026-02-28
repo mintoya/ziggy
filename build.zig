@@ -9,26 +9,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    cMod.addIncludePath(b.path("wheels"));
-
-    const listMod = b.addModule("clist", .{
-        .root_source_file = b.path("src/my-list.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "c_Imports", .module = cMod },
-        },
-    });
-
-    const mapMod = b.addModule("cmap", .{
-        .root_source_file = b.path("src/my-map.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "clist", .module = listMod },
-            .{ .name = "c_Imports", .module = cMod },
-        },
-    });
+    // cMod.addIncludePath(b.path("wheels"));
 
     const exe = b.addExecutable(.{
         .name = "app",
@@ -36,62 +17,30 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "c_Imports", .module = cMod },
-                .{ .name = "clist", .module = listMod },
-                .{ .name = "cmap", .module = mapMod },
             },
         }),
     });
 
-    exe.linkLibC();
-    exe.root_module.addCSourceFile(
-        .{
-            .file = .{
-                .cwd_relative = "wheels/examples/includeAll.c",
-            },
-        },
-    );
+    exe.root_module.addCSourceFile(.{
+        .file = .{ .cwd_relative = "wheels/examples/includeAll.c" },
+        .flags = &.{ "-std=c2y", "-fblocks","-lBlocksRuntime" },
+        .language = .c,
+    });
+    exe.root_module.addIncludePath(b.path("wheels"));
+    exe.root_module.linkSystemLibrary("BlocksRuntime", .{});
 
     b.installArtifact(exe);
 
-    const run_step = b.step("run", "Run the app");
+    const check = b.step("check", "lsp check");
+    check.dependOn(&exe.step);
+
+    const run_step = b.step("run", "run");
     const run_cmd = b.addRunArtifact(exe);
     run_step.dependOn(&run_cmd.step);
 
-    if (b.args) |args| {
+    if (b.args) |args|
         run_cmd.addArgs(args);
-    }
-
-    const test_step = b.step("test", "Run tests");
-
-    const main_tests = b.addTest(.{
-        .name = "main_tests",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "c_Imports", .module = cMod },
-                .{ .name = "clist", .module = listMod },
-                .{ .name = "cmap", .module = mapMod },
-            },
-        }),
-    });
-
-    main_tests.root_module.addImport("c_Imports", cMod);
-    main_tests.root_module.addImport("clist", listMod);
-    main_tests.root_module.addImport("cmap", mapMod);
-
-    main_tests.root_module.addCSourceFile(
-        .{
-            .file = .{
-                .cwd_relative = "wheels/examples/includeAll.c",
-            },
-        },
-    );
-    main_tests.linkLibC();
-
-    const run_main_tests = b.addRunArtifact(main_tests);
-    test_step.dependOn(&run_main_tests.step);
 }
