@@ -26,7 +26,11 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addCSourceFile(.{
         .file = .{ .cwd_relative = "wheels/examples/includeAll.c" },
-        .flags = &.{ "-std=c2y", "-fblocks","-lBlocksRuntime" },
+        .flags = &.{
+            "-std=c2y",
+            "-fblocks",
+            "-lBlocksRuntime",
+        },
         .language = .c,
     });
     exe.root_module.addIncludePath(b.path("wheels"));
